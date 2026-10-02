@@ -146,7 +146,7 @@ export function loadSession(): { baseUrl?: string; jobId?: string } {
     return {};
   }
 }
-export function saveSession(s: { baseUrl?: string; jobId?: string }) {
+export function saveSession(s: { baseUrl?: string | undefined; jobId?: string | undefined }) {
   try {
     sessionStorage.setItem(SS_KEY, JSON.stringify({ baseUrl: s.baseUrl, jobId: s.jobId }));
   } catch {
