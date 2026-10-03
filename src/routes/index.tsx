@@ -46,7 +46,6 @@ function errMsg(e: unknown) {
 
 function Lab() {
   const [dark, setDark] = useState(true);
-  const [open, setOpen] = useState(true);
   const [baseUrl, setBaseUrl] = useState("");
   const [token, setToken] = useState(""); // somente memória
   const [conn, setConn] = useState<ConnState>({ kind: "idle" });
@@ -113,14 +112,22 @@ function Lab() {
   });
   const job = jobQ.data?.id === jobId ? jobQ.data : undefined;
 
-  // Busca GLB autenticado quando concluído.
+  // Busca GLB autenticado quando concluído — no máximo uma vez por job id.
+  const fetchedJobRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!job || job.status !== "succeeded" || !hasCreds || glbRef.current) return;
+    if (!job || job.status !== "succeeded" || !hasCreds) return;
+    if (fetchedJobRef.current === job.id) return;
+    fetchedJobRef.current = job.id;
     let cancel = false;
     setResultErr(null);
     getResult(c, job.id)
       .then((b) => { if (!cancel) setGlb(URL.createObjectURL(b)); })
-      .catch((e) => { if (!cancel) setResultErr(errMsg(e)); });
+      .catch((e) => {
+        if (!cancel) {
+          fetchedJobRef.current = null; // permite nova tentativa manual
+          setResultErr(errMsg(e));
+        }
+      });
     return () => { cancel = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id, job?.status, hasCreds]);
