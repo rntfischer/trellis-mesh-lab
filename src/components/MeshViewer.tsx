@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 // Visualizador GLB real: three.js carregado dinamicamente (somente no navegador).
-export function MeshViewer({ url }: { url: string }) {
+// O GLB é carregado direto da URL do servidor com os cabeçalhos de autenticação.
+export function MeshViewer({ url, token }: { url: string; token: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -33,7 +34,12 @@ export function MeshViewer({ url }: { url: string }) {
         renderer.render(scene, camera);
         raf = requestAnimationFrame(loop);
       };
-      new GLTFLoader().load(
+      const loader = new GLTFLoader();
+      loader.setRequestHeader({
+        "X-API-Token": token,
+        "ngrok-skip-browser-warning": "1",
+      });
+      loader.load(
         url,
         (gltf) => {
           if (disposed) return;
@@ -48,7 +54,7 @@ export function MeshViewer({ url }: { url: string }) {
           loop();
         },
         undefined,
-        () => setErr("Não foi possível ler o arquivo GLB."),
+        () => setErr("Não foi possível carregar o GLB do servidor."),
       );
       const ro = new ResizeObserver(() => {
         renderer.setSize(el.clientWidth, el.clientHeight);
@@ -74,7 +80,7 @@ export function MeshViewer({ url }: { url: string }) {
       disposed = true;
       cleanup();
     };
-  }, [url]);
+  }, [url, token]);
 
   return (
     <div className="relative h-full w-full">
