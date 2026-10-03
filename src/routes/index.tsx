@@ -56,9 +56,8 @@ function Lab() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
-  const [glbUrl, setGlbUrl] = useState<string | null>(null);
   const [resultErr, setResultErr] = useState<string | null>(null);
-  const glbRef = useRef<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -76,12 +75,6 @@ function Lab() {
 
   // Revoga object URLs ao trocar.
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  const setGlb = (u: string | null) => {
-    if (glbRef.current) URL.revokeObjectURL(glbRef.current);
-    glbRef.current = u;
-    setGlbUrl(u);
-  };
-  useEffect(() => () => { if (glbRef.current) URL.revokeObjectURL(glbRef.current); }, []);
 
   const c: Conn = { baseUrl, token };
   const hasCreds = !!token && !!baseUrl;
