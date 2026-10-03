@@ -151,9 +151,7 @@ function Lab() {
     if (!canGenerate || !file || seed === null) return;
     setSubmitting(true);
     setSubmitErr(null);
-    setGlb(null);
     setResultErr(null);
-    fetchedJobRef.current = null;
     try {
       const j = await createJob(c, file, seed); // nunca repetido automaticamente
       setJobId(j.id);
@@ -166,9 +164,7 @@ function Lab() {
 
   function clearJob() {
     setJobId(null);
-    setGlb(null);
     setResultErr(null);
-    fetchedJobRef.current = null;
   }
 
   const pollErr = jobQ.error ? errMsg(jobQ.error) : null;
@@ -283,10 +279,10 @@ function Lab() {
             </div>
 
             <div className="relative min-h-[360px] flex-1 lg:min-h-[480px]">
-              {glbUrl ? (
+              {resultUrl ? (
                 <ClientOnly fallback={null}>
                   <Suspense fallback={<Center>Carregando visualizador…</Center>}>
-                    <MeshViewer url={glbUrl} />
+                    <MeshViewer url={resultUrl} token={token} />
                   </Suspense>
                 </ClientOnly>
               ) : (
@@ -297,7 +293,7 @@ function Lab() {
                   {job?.status === "queued" && "Job na fila do servidor."}
                   {job?.status === "running" && "O servidor está processando a malha."}
                   {job?.status === "failed" && <span className="text-destructive">Falha: {job.error ?? "sem detalhes do servidor."}</span>}
-                  {job?.status === "succeeded" && !resultErr && "Baixando GLB…"}
+                  {job?.status === "succeeded" && !hasCreds && "Informe a senha da API para ver o resultado."}
                 </Center>
               )}
             </div>
@@ -310,9 +306,9 @@ function Lab() {
             {resultErr && <p className="text-sm text-destructive">{resultErr}</p>}
 
             <div className="flex flex-wrap gap-2">
-              {glbUrl && (
-                <Button asChild>
-                  <a href={glbUrl} download={`magna-mesh-${jobId}.glb`}>Baixar GLB</a>
+              {resultUrl && (
+                <Button onClick={downloadGlb} disabled={downloading}>
+                  {downloading ? "Baixando…" : "Baixar GLB"}
                 </Button>
               )}
               {jobId && !busy && <Button variant="outline" onClick={clearJob}>Limpar resultado</Button>}
