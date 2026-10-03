@@ -155,6 +155,7 @@ function Lab() {
     setSubmitErr(null);
     setGlb(null);
     setResultErr(null);
+    fetchedJobRef.current = null;
     try {
       const j = await createJob(c, file, seed); // nunca repetido automaticamente
       setJobId(j.id);
@@ -169,6 +170,7 @@ function Lab() {
     setJobId(null);
     setGlb(null);
     setResultErr(null);
+    fetchedJobRef.current = null;
   }
 
   const pollErr = jobQ.error ? errMsg(jobQ.error) : null;
@@ -188,14 +190,17 @@ function Lab() {
         </header>
 
         {/* Configuração */}
-        <Collapsible open={open} onOpenChange={setOpen} className="airbrush-panel p-5">
+        <Collapsible defaultOpen className="airbrush-panel group p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">Conexão</h2>
               <ConnBadge state={conn} />
             </div>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">{open ? "Recolher" : "Configurar"}</Button>
+              <Button variant="ghost" size="sm">
+                <span className="group-data-[state=open]:hidden">Configurar</span>
+                <span className="group-data-[state=closed]:hidden">Recolher</span>
+              </Button>
             </CollapsibleTrigger>
           </div>
           <CollapsibleContent className="mt-4 space-y-4">
