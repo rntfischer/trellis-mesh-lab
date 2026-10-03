@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,9 +56,8 @@ function Lab() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
-  const [glbUrl, setGlbUrl] = useState<string | null>(null);
   const [resultErr, setResultErr] = useState<string | null>(null);
-  const glbRef = useRef<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -76,12 +75,6 @@ function Lab() {
 
   // Revoga object URLs ao trocar.
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  const setGlb = (u: string | null) => {
-    if (glbRef.current) URL.revokeObjectURL(glbRef.current);
-    glbRef.current = u;
-    setGlbUrl(u);
-  };
-  useEffect(() => () => { if (glbRef.current) URL.revokeObjectURL(glbRef.current); }, []);
 
   const c: Conn = { baseUrl, token };
   const hasCreds = !!token && !!baseUrl;
@@ -112,25 +105,30 @@ function Lab() {
   });
   const job = jobQ.data?.id === jobId ? jobQ.data : undefined;
 
-  // Busca GLB autenticado quando concluído — no máximo uma vez por job id.
-  const fetchedJobRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!job || job.status !== "succeeded" || !hasCreds) return;
-    if (fetchedJobRef.current === job.id) return;
-    fetchedJobRef.current = job.id;
-    let cancel = false;
+  // Sem download automático: o visualizador carrega o GLB direto da URL do servidor.
+  const resultUrl =
+    job?.status === "succeeded" && hasCreds
+      ? `${normalizeBaseUrl(baseUrl)}/jobs/${encodeURIComponent(job.id)}/result`
+      : null;
+
+  async function downloadGlb() {
+    if (!job || downloading) return;
+    setDownloading(true);
     setResultErr(null);
-    getResult(c, job.id)
-      .then((b) => { if (!cancel) setGlb(URL.createObjectURL(b)); })
-      .catch((e) => {
-        if (!cancel) {
-          fetchedJobRef.current = null; // permite nova tentativa manual
-          setResultErr(errMsg(e));
-        }
-      });
-    return () => { cancel = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.id, job?.status, hasCreds]);
+    try {
+      const blob = await getResult(c, job.id);
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `magna-mesh-${job.id}.glb`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(u), 10_000);
+    } catch (e) {
+      setResultErr(errMsg(e));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function onFile(f: File | undefined) {
     setFile(null);
@@ -153,9 +151,7 @@ function Lab() {
     if (!canGenerate || !file || seed === null) return;
     setSubmitting(true);
     setSubmitErr(null);
-    setGlb(null);
     setResultErr(null);
-    fetchedJobRef.current = null;
     try {
       const j = await createJob(c, file, seed); // nunca repetido automaticamente
       setJobId(j.id);
@@ -168,9 +164,7 @@ function Lab() {
 
   function clearJob() {
     setJobId(null);
-    setGlb(null);
     setResultErr(null);
-    fetchedJobRef.current = null;
   }
 
   const pollErr = jobQ.error ? errMsg(jobQ.error) : null;
@@ -285,10 +279,10 @@ function Lab() {
             </div>
 
             <div className="relative min-h-[360px] flex-1 lg:min-h-[480px]">
-              {glbUrl ? (
+              {resultUrl ? (
                 <ClientOnly fallback={null}>
                   <Suspense fallback={<Center>Carregando visualizador…</Center>}>
-                    <MeshViewer url={glbUrl} />
+                    <MeshViewer url={resultUrl} token={token} />
                   </Suspense>
                 </ClientOnly>
               ) : (
@@ -299,7 +293,7 @@ function Lab() {
                   {job?.status === "queued" && "Job na fila do servidor."}
                   {job?.status === "running" && "O servidor está processando a malha."}
                   {job?.status === "failed" && <span className="text-destructive">Falha: {job.error ?? "sem detalhes do servidor."}</span>}
-                  {job?.status === "succeeded" && !resultErr && "Baixando GLB…"}
+                  {job?.status === "succeeded" && !hasCreds && "Informe a senha da API para ver o resultado."}
                 </Center>
               )}
             </div>
@@ -312,9 +306,9 @@ function Lab() {
             {resultErr && <p className="text-sm text-destructive">{resultErr}</p>}
 
             <div className="flex flex-wrap gap-2">
-              {glbUrl && (
-                <Button asChild>
-                  <a href={glbUrl} download={`magna-mesh-${jobId}.glb`}>Baixar GLB</a>
+              {resultUrl && (
+                <Button onClick={downloadGlb} disabled={downloading}>
+                  {downloading ? "Baixando…" : "Baixar GLB"}
                 </Button>
               )}
               {jobId && !busy && <Button variant="outline" onClick={clearJob}>Limpar resultado</Button>}
