@@ -105,25 +105,30 @@ function Lab() {
   });
   const job = jobQ.data?.id === jobId ? jobQ.data : undefined;
 
-  // Busca GLB autenticado quando concluído — no máximo uma vez por job id.
-  const fetchedJobRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!job || job.status !== "succeeded" || !hasCreds) return;
-    if (fetchedJobRef.current === job.id) return;
-    fetchedJobRef.current = job.id;
-    let cancel = false;
+  // Sem download automático: o visualizador carrega o GLB direto da URL do servidor.
+  const resultUrl =
+    job?.status === "succeeded" && hasCreds
+      ? `${normalizeBaseUrl(baseUrl)}/jobs/${encodeURIComponent(job.id)}/result`
+      : null;
+
+  async function downloadGlb() {
+    if (!job || downloading) return;
+    setDownloading(true);
     setResultErr(null);
-    getResult(c, job.id)
-      .then((b) => { if (!cancel) setGlb(URL.createObjectURL(b)); })
-      .catch((e) => {
-        if (!cancel) {
-          fetchedJobRef.current = null; // permite nova tentativa manual
-          setResultErr(errMsg(e));
-        }
-      });
-    return () => { cancel = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.id, job?.status, hasCreds]);
+    try {
+      const blob = await getResult(c, job.id);
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `magna-mesh-${job.id}.glb`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(u), 10_000);
+    } catch (e) {
+      setResultErr(errMsg(e));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function onFile(f: File | undefined) {
     setFile(null);
